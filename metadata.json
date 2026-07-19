@@ -1,0 +1,6 @@
+{
+  "name": "HermesBro Profile Lab",
+  "description": "Generate, customize, and manage profiles, configs, and shell installers for Hermes Agent. Uses Gemini AI to dynamically refine agent souls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
