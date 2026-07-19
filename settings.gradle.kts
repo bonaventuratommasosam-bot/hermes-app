@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "HermesBro Cloud"
+rootProject.name = "Hermes Profile Lab"
 
 include(":app")

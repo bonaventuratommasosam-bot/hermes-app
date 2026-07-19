@@ -1,21 +1,22 @@
-# Build output
+# Gradle files
+.gradle/
 build/
 **/build/
-*.apk
-*.aab
 
-# Signing / secrets — MAI nel repo
+# IDE files
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# Keystores and Secrets
 *.jks
 *.keystore
 debug.keystore
+debug.keystore.base64
 local.properties
-gradle.properties.local
+.env
 
-# Gradle / IDE
-.gradle/
-.idea/
-*.iml
-captures/
-
-# OS
+# OS files
 .DS_Store
+Thumbs.db

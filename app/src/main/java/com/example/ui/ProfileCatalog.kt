@@ -18,7 +18,8 @@ data class ProfileMeta(
     val accent: String,
     val defaultProvider: String,
     val defaultModel: String,
-    val tags: List<String>
+    val tags: List<String>,
+    val customAvatar: String? = null
 )
 
 object ProfileCatalog {
