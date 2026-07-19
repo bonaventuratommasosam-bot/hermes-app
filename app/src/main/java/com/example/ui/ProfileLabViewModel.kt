@@ -75,6 +75,8 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setDeploy(d: DeployConfig) { deploy.value = d }
 
+    fun markCopied() { copied.value = true }
+
     /** Assembla l'output reale: per ogni profilo scelto genera SOUL + config + deploy script. */
     fun generate() {
         viewModelScope.launch(Dispatchers.Default) {

@@ -167,6 +167,7 @@ private fun DeployStep(
     var botToken by remember { mutableStateOf(deploy.botToken) }
     var sshHost by remember { mutableStateOf(deploy.sshHost) }
     var sshUser by remember { mutableStateOf(deploy.sshUser) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
 
     LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -207,6 +208,16 @@ private fun DeployStep(
         }
         if (output.isNotBlank()) {
             item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Output generato", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Button(onClick = {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))
+                        vm.markCopied()
+                    }, colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack)) {
+                        Text(if (vm.copied.value) "Copiato ✓" else "Copia")
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
                     Text(output, color = NeonGreen, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.padding(12.dp))
                 }
