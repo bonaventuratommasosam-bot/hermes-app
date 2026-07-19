@@ -1,0 +1,223 @@
+package com.example.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.ui.theme.*
+
+/**
+ * HermesBro Profile Lab — wizard a 3 step.
+ * Step 0: Catalogo (multi-select)
+ * Step 1: Provider + API key per profilo
+ * Step 2: Output (CLI / Telegram / SSH) con comandi reali
+ * Nessuna metrica simulata, nessun "reboot finto".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileLabScreen(
+    viewModel: ProfileLabViewModel,
+    modifier: Modifier = Modifier
+) {
+    val catalog by viewModel.catalog.collectAsState()
+    val selected by viewModel.selected.collectAsState()
+    val step by viewModel.step.collectAsState()
+    val deploy by viewModel.deploy.collectAsState()
+    val output by viewModel.generatedOutput.collectAsState()
+
+    Column(modifier.fillMaxSize().background(ObsidianBlack)) {
+        TopAppBar(
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("HermesBro", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(" · Profile Lab", color = MutedBlueGray, fontSize = 12.sp)
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = ObsidianBlack)
+        )
+
+        // Stepper
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("1 Catalogo", "2 Provider", "3 Deploy").forEachIndexed { i, label ->
+                val active = step == i
+                Surface(
+                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (active) ElectricCyan.copy(alpha = 0.2f) else CharcoalGray
+                ) {
+                    Text(label, color = if (active) ElectricCyan else MutedBlueGray, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                }
+            }
+        }
+
+        when (step) {
+            0 -> CatalogStep(viewModel, catalog, selected)
+            1 -> ProviderStep(viewModel, selected)
+            2 -> DeployStep(viewModel, deploy, output, selected)
+        }
+    }
+}
+
+@Composable
+private fun CatalogStep(
+    vm: ProfileLabViewModel,
+    catalog: List<ProfileMeta>,
+    selected: Map<String, ProfileSelection>
+) {
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(catalog) { meta ->
+            val isSel = selected.containsKey(meta.id)
+            Card(
+                Modifier.fillMaxWidth().clickable { vm.toggleProfile(meta) },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isSel) ElectricCyan.copy(alpha = 0.18f) else CharcoalGray)
+            ) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(meta.emoji, fontSize = 28.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(meta.displayName, color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(meta.tagline, color = MutedBlueGray, fontSize = 11.sp)
+                        Row(Modifier.padding(top = 4.dp)) {
+                            meta.tags.forEach { t ->
+                                Text("#$t ", color = BrightTeal, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                    Checkbox(checked = isSel, onCheckedChange = { vm.toggleProfile(meta) }, colors = CheckboxDefaults.colors(checkedColor = ElectricCyan))
+                }
+            }
+        }
+        item {
+            Button(
+                onClick = { if (selected.isNotEmpty()) vm.setStep(1) },
+                enabled = selected.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) { Text("Avanti (${selected.size} selezionati)", fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+@Composable
+private fun ProviderStep(vm: ProfileLabViewModel, selected: Map<String, ProfileSelection>) {
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(selected.values.toList()) { sel ->
+            var prov by remember { mutableStateOf(sel.provider) }
+            var model by remember { mutableStateOf(sel.model) }
+            var key by remember { mutableStateOf(sel.apiKey) }
+            var baseUrl by remember { mutableStateOf(sel.baseUrl) }
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CharcoalGray)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(sel.displayName, color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = prov, onValueChange = { prov = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
+                        label = { Text("Provider", color = MutedBlueGray) }, singleLine = true,
+                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = model, onValueChange = { model = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
+                        label = { Text("Model (es. gemini-2.5-flash)", color = MutedBlueGray) }, singleLine = true,
+                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = key, onValueChange = { key = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
+                        label = { Text("API Key (resta locale)", color = MutedBlueGray) }, singleLine = true,
+                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = baseUrl, onValueChange = { baseUrl = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
+                        label = { Text("Base URL (solo custom)", color = MutedBlueGray) }, singleLine = true,
+                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.setStep(0) }, modifier = Modifier.weight(1f)) { Text("Indietro") }
+                Button(onClick = { vm.setStep(2) }, colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack), modifier = Modifier.weight(1f)) { Text("Genera") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeployStep(
+    vm: ProfileLabViewModel,
+    deploy: DeployConfig,
+    output: String,
+    selected: Map<String, ProfileSelection>
+) {
+    var mode by remember { mutableStateOf(deploy.mode) }
+    var botToken by remember { mutableStateOf(deploy.botToken) }
+    var sshHost by remember { mutableStateOf(deploy.sshHost) }
+    var sshUser by remember { mutableStateOf(deploy.sshUser) }
+
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Text("Metodo di installazione", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("cli" to "CLI locale", "telegram" to "Telegram", "ssh" to "SSH server").forEach { (m, label) ->
+                    val active = mode == m
+                    Surface(
+                        onClick = { mode = m; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
+                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (active) ElectricCyan.copy(alpha = 0.2f) else CharcoalGray
+                    ) {
+                        Text(label, color = if (active) ElectricCyan else MutedBlueGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        if (mode == "telegram") {
+            item {
+                OutlinedTextField(value = botToken, onValueChange = { botToken = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
+                    label = { Text("Bot Token", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+            }
+        }
+        if (mode == "ssh") {
+            item {
+                OutlinedTextField(value = sshHost, onValueChange = { sshHost = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
+                    label = { Text("Host (es. 1.2.3.4)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(value = sshUser, onValueChange = { sshUser = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
+                    label = { Text("User (es. hermes-pc)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+            }
+        }
+        item {
+            Button(onClick = { vm.generate() }, colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack), modifier = Modifier.fillMaxWidth()) {
+                Text("Genera file & comandi", fontWeight = FontWeight.Bold)
+            }
+        }
+        if (output.isNotBlank()) {
+            item {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
+                    Text(output, color = NeonGreen, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.padding(12.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = ElectricCyan, unfocusedBorderColor = SlateSteel,
+    focusedContainerColor = CharcoalGray, unfocusedContainerColor = CharcoalGray,
+    focusedTextColor = PureWhite, unfocusedTextColor = PureWhite
+)

@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "frank",
+      "displayName": "Frank (Jarvis)",
+      "tagline": "Operatore autonomo stile Jarvis — anticipa, coordina, avverte.",
+      "emoji": "🤖",
+      "accent": "ElectricCyan",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["generalista", "full-stack", "proattivo"],
+      "aura": "groucho-jarvis-malka"
+    },
+    {
+      "id": "h2bb",
+      "displayName": "H2BB Trader",
+      "tagline": "Agente di trading autonomo su Base chain / Hyperliquid.",
+      "emoji": "📈",
+      "accent": "NeonGreen",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["trading", "crypto", "autonomo"],
+      "aura": "calm-trader"
+    },
+    {
+      "id": "study",
+      "displayName": "Study Tutor",
+      "tagline": "Tutor di maturità — Feynman + Montessori + Socrate.",
+      "emoji": "📚",
+      "accent": "BrightTeal",
+      "defaultProvider": "gemini",
+      "defaultModel": "gemini-2.5-flash",
+      "tags": ["studio", "educazione", "italiano"],
+      "aura": "feynman"
+    },
+    {
+      "id": "study-glm",
+      "displayName": "Study GLM",
+      "tagline": "Tutor di maturità su provider GLM (Venice.ai).",
+      "emoji": "📖",
+      "accent": "BrightTeal",
+      "defaultProvider": "custom",
+      "defaultModel": "glm-5.2",
+      "tags": ["studio", "educazione", "glm"],
+      "aura": "feynman"
+    },
+    {
+      "id": "trader",
+      "displayName": "Trader Base",
+      "tagline": "Due diligence rapida micro-cap Base chain, scam gating.",
+      "emoji": "⚡",
+      "accent": "CyberPink",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["trading", "base", "research"],
+      "aura": "malka"
+    },
+    {
+      "id": "cuoco",
+      "displayName": "Cuoco TutVin",
+      "tagline": "Food cost, fornitori, prep timer per la cucina.",
+      "emoji": "🍳",
+      "accent": "BrightOrange",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["cucina", "foodcost", "operativo"],
+      "aura": "jarvis"
+    },
+    {
+      "id": "devops",
+      "displayName": "DevOps VPS",
+      "tagline": "Monitoring server, deploy, diagnostica infrastruttura.",
+      "emoji": "🛠️",
+      "accent": "SlateSteel",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["devops", "vps", "infra"],
+      "aura": "jarvis"
+    },
+    {
+      "id": "content",
+      "displayName": "Content Bro",
+      "tagline": "Copy, articoli e thread per hermesbro.cloud.",
+      "emoji": "✍️",
+      "accent": "DeepCyberPurple",
+      "defaultProvider": "openrouter",
+      "defaultModel": "anthropic/claude-3.5-sonnet",
+      "tags": ["content", "marketing", "copy"],
+      "aura": "groucho"
+    }
+  ]
+}
