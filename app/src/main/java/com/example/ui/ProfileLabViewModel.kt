@@ -203,7 +203,7 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
                         emoji = emoji.ifBlank { "✨" },
                         accent = "ElectricCyan",
                         defaultProvider = "gemini",
-                        defaultModel = "gemini-1.5-flash",
+                        defaultModel = "gemini-2.5-flash",
                         tags = listOf("custom", "ai-generated"),
                         customAvatar = customAvatar
                     )
