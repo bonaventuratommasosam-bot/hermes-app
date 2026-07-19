@@ -1,5 +1,9 @@
 package com.example.ui
 
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
+
 /**
  * Builder di config.yaml Hermes — ONESTO.
  * Regole (da hermes-profile-authoring):
@@ -139,5 +143,68 @@ CFG_EOF
 echo "Profilo $profileId installato su ${D}REMOTE"
 echo "Su quel server lancia:  hermes -p $profileId"
 """.trimIndent()
+    }
+
+    /**
+     * Corpo JSON per il Launcher VPS (endpoint /api/bot-launch/launch).
+     * Nessun secret nell'app: il X-Launcher-Secret è iniettato da nginx lato server.
+     * Se soul+config sono forniti, il VPS genera un profilo CUSTOM (es. "Crea con AI").
+     */
+    fun buildLaunchJson(
+        profileId: String,
+        botToken: String,
+        userId: String,
+        soul: String = "",
+        configYaml: String = ""
+    ): String {
+        val obj = JSONObject()
+        obj.put("profile", profileId)
+        obj.put("telegram_token", botToken)
+        obj.put("user_id", userId.ifBlank { "app" })
+        if (soul.isNotBlank() && configYaml.isNotBlank()) {
+            obj.put("soul", soul)
+            obj.put("config", configYaml)
+        }
+        return obj.toString()
+    }
+
+    /**
+     * Client reale verso il Launcher VPS.
+     * POST {baseUrl}/api/bot-launch/launch  con il JSON di buildLaunchJson.
+     * Ritorna la risposta (es. {"instance":"frank_app","status":"launched"}) o lancia eccezione con il messaggio di errore.
+     */
+    object LaunchClient {
+        fun launch(
+            baseUrl: String,
+            profileId: String,
+            botToken: String,
+            userId: String,
+            soul: String = "",
+            configYaml: String = ""
+        ): String {
+            val url = "${baseUrl.trimEnd('/')}/api/bot-launch/launch"
+            val body = buildLaunchJson(profileId, botToken, userId, soul, configYaml)
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 30000
+            conn.readTimeout = 30000
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            val resp = if (code in 200..299) {
+                conn.inputStream.bufferedReader().readText()
+            } else {
+                conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+            }
+            if (code !in 200..299) {
+                // prova a estrarre il messaggio FastAPI {"detail":"..."}
+                val msg = try {
+                    JSONObject(resp).optString("detail", resp)
+                } catch (_: Exception) { resp }
+                throw Exception("Launcher HTTP $code: $msg")
+            }
+            return resp
+        }
     }
 }

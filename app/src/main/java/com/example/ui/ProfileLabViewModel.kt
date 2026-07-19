@@ -65,6 +65,18 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
     val isGeneratingCustomSoul = MutableStateFlow(false)
     val customSoulGenerationError = MutableStateFlow<String?>(null)
 
+    // Deploy reale verso il Launcher VPS (endpoint /api/bot-launch/launch).
+    // Il secret è iniettato da nginx: l'app manda solo profile+token+userId.
+    val launcherBaseUrl: MutableStateFlow<String> = MutableStateFlow(
+        prefs.getString("launcher_base_url", "https://hermesbro.cloud") ?: "https://hermesbro.cloud"
+    )
+    val launchUserId: MutableStateFlow<String> = MutableStateFlow(
+        prefs.getString("launch_user_id", "app") ?: "app"
+    )
+    val isLaunching = MutableStateFlow(false)
+    val launchResult = MutableStateFlow<String?>(null)
+    val launchError = MutableStateFlow<String?>(null)
+
     init {
         loadCatalog()
         loadPersistedState()
@@ -491,6 +503,68 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
             prefs.edit().putString("generated_output", sb.toString()).apply()
             withContext(Dispatchers.Main) {
                 addCurrentConfigToSaved()
+            }
+            // Deploy reale su VPS se mode=telegram e token presente
+            if (deploy.value.mode == "telegram" && deploy.value.botToken.isNotBlank()) {
+                deployToTelegram()
+            }
+        }
+    }
+
+    fun setLauncherBaseUrl(url: String) {
+        launcherBaseUrl.value = url
+        prefs.edit().putString("launcher_base_url", url).apply()
+    }
+
+    fun setLaunchUserId(id: String) {
+        launchUserId.value = id.ifBlank { "app" }
+        prefs.edit().putString("launch_user_id", launchUserId.value).apply()
+    }
+
+    /**
+     * Deploy reale: chiama il Launcher VPS via ConfigBuilder.LaunchClient.
+     * Per ogni profilo selezionato: POST /api/bot-launch/launch con
+     * profile + telegram_token + user_id (+ soul/config se il profilo è custom).
+     * Il secret è iniettato da nginx lato server: non vive nell'app.
+     */
+    fun deployToTelegram() {
+        val sel = selected.value.values.toList()
+        if (sel.isEmpty()) return
+        val token = deploy.value.botToken
+        if (token.isBlank()) { launchError.value = "Inserisci il Telegram bot token"; return }
+        viewModelScope.launch(Dispatchers.Default) {
+            isLaunching.value = true
+            launchError.value = null
+            launchResult.value = null
+            val results = mutableListOf<String>()
+            try {
+                sel.forEach { s ->
+                    val soul = getSoul(s.id)
+                    val pc = ProviderConfig(
+                        provider = s.provider,
+                        model = s.model.ifBlank { ConfigBuilder.preset(s.provider).model },
+                        apiKey = s.apiKey,
+                        baseUrl = s.baseUrl,
+                        apiMode = if (s.provider == "anthropic") "anthropic" else "openai"
+                    )
+                    val cfg = ConfigBuilder.buildConfigYaml(s.id, pc)
+                    // soul+config custom solo se il profilo è stato generato (es. "Crea con AI")
+                    val isCustom = prefs.contains("custom_soul_${s.id}")
+                    val resp = ConfigBuilder.LaunchClient.launch(
+                        baseUrl = launcherBaseUrl.value,
+                        profileId = s.id,
+                        botToken = token,
+                        userId = launchUserId.value,
+                        soul = if (isCustom) soul else "",
+                        configYaml = if (isCustom) cfg else ""
+                    )
+                    results.add("${s.displayName}: $resp")
+                }
+                launchResult.value = results.joinToString("\n")
+            } catch (e: Exception) {
+                launchError.value = e.message ?: "Errore sconosciuto nel deploy"
+            } finally {
+                isLaunching.value = false
             }
         }
     }

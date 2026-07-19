@@ -569,6 +569,16 @@ private fun DeployStep(
                 OutlinedTextField(value = botToken, onValueChange = { botToken = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
                     label = { Text("Bot Token", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
             }
+            item {
+                Text("Deploy su VPS (hermesbro.cloud)", color = ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(value = vm.launcherBaseUrl.value, onValueChange = { vm.setLauncherBaseUrl(it) },
+                    label = { Text("Launcher URL", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(value = vm.launchUserId.value, onValueChange = { vm.setLaunchUserId(it) },
+                    label = { Text("User ID (distingue le tue istanze)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+                Text("Il bot viene creato live su Telegram sul VPS. Il secret è gestito dal server.", color = MutedBlueGray, fontSize = 10.sp)
+            }
         }
         if (mode == "ssh") {
             item {
@@ -612,6 +622,27 @@ private fun DeployStep(
                 Spacer(Modifier.height(6.dp))
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
                     Text(output, color = NeonGreen, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.padding(12.dp))
+                }
+            }
+            // Stato deploy reale su VPS (solo mode telegram) — dentro item{} per scope composable
+            if (mode == "telegram") {
+                item {
+                    val isLaunching = vm.isLaunching.collectAsState().value
+                    val launchResult = vm.launchResult.collectAsState().value
+                    val launchError = vm.launchError.collectAsState().value
+                    if (isLaunching) {
+                        Text("⏳ Deploy in corso su VPS...", color = ElectricCyan, fontSize = 12.sp)
+                    }
+                    launchError?.let { err ->
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DeepCyberPurple)) {
+                            Text("⚠ $err", color = PureWhite, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
+                        }
+                    }
+                    launchResult?.let { res ->
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
+                            Text("✅ Bot live su VPS:\n$res", color = NeonGreen, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
+                        }
+                    }
                 }
             }
         }
