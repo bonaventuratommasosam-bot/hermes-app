@@ -1,8 +1,0 @@
-{
-  "name": "HermesBro Cloud",
-  "description": "Official companion app for hermesbro.cloud cloud storage and service dashboard.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

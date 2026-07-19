@@ -8,7 +8,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.hermesbro.qwxzt"
+    applicationId = "com.example"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
@@ -42,18 +42,24 @@ android {
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
+
+  packaging {
+    jniLibs { useLegacyPackaging = true }
+  }
+
   buildFeatures {
     compose = true
     buildConfig = true
   }
+
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
+
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.activity.compose)
@@ -70,15 +76,5 @@ dependencies {
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
 
-  testImplementation(libs.androidx.compose.ui.test.junit4)
-  testImplementation(libs.androidx.core)
-  testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
-  testImplementation(libs.kotlinx.coroutines.test)
-  androidTestImplementation(platform(libs.androidx.compose.bom))
-  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-  androidTestImplementation(libs.androidx.espresso.core)
-  androidTestImplementation(libs.androidx.junit)
-  androidTestImplementation(libs.androidx.runner)
-  debugImplementation(libs.androidx.compose.ui.tooling)
 }
