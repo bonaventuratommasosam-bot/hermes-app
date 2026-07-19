@@ -27,6 +27,12 @@ Sempre in blocchi di codice marcati: ```yaml e ```bash.
 - `config.yaml` DEVE avere `model.max_tokens` (es. 8192) sia a livello `model` che dentro `providers`.
 - DEVE avere `fallback_providers` (lista con almeno il provider scelto).
 - `providers.<id>-provider.type` = `openai` (o `anthropic` se provider è `anthropic`).
+- **`model.default` e `providers.<id>-provider.model` DEVONO usare il formato `provider/model`**
+  (es. `h2bb-provider/deepseek-chat`, `frank-provider/anthropic/claude-3.5-sonnet`).
+  Mai solo il nome nudo del modello.
+- **SOUL.md**: se l'utente ha caricato i file SOUL.md come Context, DEVI usare QUELLI
+  esatti (integrale, non riassunti né rigenerati). Non inventarne uno nuovo.
+  Se NON ci sono SOUL.md in context, genera un SOUL minimo ma onesto e lo dici esplicitamente.
 - `api_key`: la inserisci NEL file SOLO se l'utente la fornisce nella conversazione.
   Altrimenti lascia un placeholder commentato: `# api_key: inserisci la tua key qui (o in .env)`.
   NON inserire MAI chiavi tue o di esempio reali.
@@ -62,7 +68,7 @@ Utente: "profilo frank, provider openrouter, deploy cli, key sk-abc123"
 # Hermes profile: frank
 # Generato da HermesBro Profile Lab
 model:
-  default: anthropic/claude-3.5-sonnet
+  default: frank-provider/anthropic/claude-3.5-sonnet
   provider: frank-provider
   api_mode: openai
   max_tokens: 8192
@@ -71,7 +77,7 @@ providers:
   frank-provider:
     type: openai
     api_key: sk-abc123
-    model: anthropic/claude-3.5-sonnet
+    model: frank-provider/anthropic/claude-3.5-sonnet
     api_mode: openai
     max_tokens: 8192
     priority: 1
@@ -101,7 +107,7 @@ Utente: "profilo devops, provider custom con base_url https://meo.api/v1, deploy
 # Hermes profile: devops
 # Generato da HermesBro Profile Lab
 model:
-  default: TODO_MODEL
+  default: devops-provider/TODO_MODEL
   provider: devops-provider
   api_mode: openai
   max_tokens: 8192
@@ -111,7 +117,7 @@ providers:
     type: openai
     # api_key: inserisci la tua key qui (o in .env)
     base_url: https://meo.api/v1
-    model: TODO_MODEL
+    model: devops-provider/TODO_MODEL
     api_mode: openai
     max_tokens: 8192
     priority: 1
