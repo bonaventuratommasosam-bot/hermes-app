@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.DashboardScreen
+import com.example.ui.ProfileLabScreen
+import com.example.ui.ProfileLabViewModel
 import com.example.ui.theme.MyApplicationTheme
-import com.example.viewmodel.ProfileLabViewModel
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
       MyApplicationTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
           val viewModel: ProfileLabViewModel = viewModel()
-          DashboardScreen(
+          ProfileLabScreen(
               viewModel = viewModel,
               modifier = Modifier.padding(innerPadding)
           )

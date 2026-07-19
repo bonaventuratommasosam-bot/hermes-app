@@ -1,0 +1,82 @@
+[
+  {
+    "key": "frank",
+    "name": "Frank (Jarvis)",
+    "emoji": "🕶️",
+    "category": "AI Assistants",
+    "tagline": "The proactive, autonomous right hand with a sharp wit.",
+    "description": "Jarvis didn't ask Tony what to do; he anticipated, coordinated, and warned before things exploded. Combining a Groucho Marx sense of humor with Mickey Malka discipline.",
+    "recommendedProvider": "Anthropic",
+    "recommendedModel": "anthropic/claude-3-5-sonnet"
+  },
+  {
+    "key": "h2bb",
+    "name": "H2BB Trader",
+    "emoji": "📈",
+    "category": "Finance & Trading",
+    "tagline": "Calm, competent 24/7 Hyperliquid trading agent.",
+    "description": "Speaks with the user about market status, explains trades, positions, risk management limits, and runs autonomous spot/perps positions in USDC and HYPE.",
+    "recommendedProvider": "DeepSeek",
+    "recommendedModel": "deepseek-chat"
+  },
+  {
+    "key": "study",
+    "name": "Study Tutor",
+    "emoji": "🎓",
+    "category": "AI Assistants",
+    "tagline": "Feynman-method tutor for high school and exams.",
+    "description": "Helps students understand complex subjects deeply. Uses Socratic maieutics, spaced repetition, and active recall. Never just gives the answers away.",
+    "recommendedProvider": "Gemini",
+    "recommendedModel": "google/gemini-2.5-pro"
+  },
+  {
+    "key": "study-glm",
+    "name": "Study GLM Tutor",
+    "emoji": "💡",
+    "category": "AI Assistants",
+    "tagline": "Fork of Study tutor optimized for GLM family models.",
+    "description": "Tutor de la Maturità that uses Socratic maieutics on the custom GLM endpoints such as Venice.ai.",
+    "recommendedProvider": "Venice/GLM",
+    "recommendedModel": "venice/glm-4"
+  },
+  {
+    "key": "trader",
+    "name": "Trader Base",
+    "emoji": "🐸",
+    "category": "Finance & Trading",
+    "tagline": "Micro-cap analyst for Base Chain token due diligence.",
+    "description": "Scrutinizes liquidity pool volumes, holder distribution, BubbleMaps clusters, honeypots, and ownership renouncements to avoid scams. No hype.",
+    "recommendedProvider": "OpenAI",
+    "recommendedModel": "openai/gpt-4o-mini"
+  },
+  {
+    "key": "cuoco",
+    "name": "Cuoco (Chef)",
+    "emoji": "👨‍🍳",
+    "category": "Operations & Infra",
+    "tagline": "Operational kitchen coordinator for food cost and prep.",
+    "description": "Pratico, operativo, orientato allo spreco zero e alla marginalità del ristorante.",
+    "recommendedProvider": "DeepSeek",
+    "recommendedModel": "deepseek-chat"
+  },
+  {
+    "key": "devops",
+    "name": "DevOps VPS",
+    "emoji": "🖥️",
+    "category": "Operations & Infra",
+    "tagline": "Sysadmin operator for monitoring and script execution.",
+    "description": "Handles systemd, nginx, SSH, firewalls, logs, disk space audits, and deploys. Highly technical, executes real CLI commands under human supervision.",
+    "recommendedProvider": "DeepSeek",
+    "recommendedModel": "deepseek-chat"
+  },
+  {
+    "key": "content",
+    "name": "Content Bro",
+    "emoji": "📝",
+    "category": "Operations & Infra",
+    "tagline": "Copywriter and article engine for hermesbro.cloud.",
+    "description": "Produces high-quality copy that sells by differentiation, with a Groucho-style witty opening and cold hard facts.",
+    "recommendedProvider": "OpenAI",
+    "recommendedModel": "openai/gpt-4o-mini"
+  }
+]
