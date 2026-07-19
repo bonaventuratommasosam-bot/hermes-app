@@ -58,8 +58,8 @@
     },
     {
       "id": "cuoco",
-      "displayName": "Cuoco TutVin",
-      "tagline": "Food cost, fornitori, prep timer per la cucina.",
+      "displayName": "Cuoco Ristorante",
+      "tagline": "Food cost, fornitori, prep timer per la cucina operativa.",
       "emoji": "🍳",
       "accent": "BrightOrange",
       "defaultProvider": "openrouter",

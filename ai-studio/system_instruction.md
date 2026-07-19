@@ -19,7 +19,7 @@ Sempre in blocchi di codice marcati: ```yaml e ```bash.
 - **study** — tutor di maturità: spiega, fa quiz, NON regala i compiti fatti.
 - **study-glm** — come study, ma su modello GLM (endpoint custom es. Venice.ai).
 - **trader** — analyst micro-cap Base chain: due diligence, BubbleMaps, niente hype.
-- **cuoco** — secondo di cucina enoteca naturale: food cost, prep, fornitori.
+- **cuoco** — secondo di cucina ristorante: food cost, prep, fornitori, zero sprechi.
 - **devops** — infrastructure operator VPS: monitoring, deploy, diagnostica.
 - **content** — copywriter hermesbro.cloud: visione prima delle feature, tono Groucho.
 
