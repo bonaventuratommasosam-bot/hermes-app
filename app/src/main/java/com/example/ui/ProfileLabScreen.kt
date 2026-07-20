@@ -188,7 +188,7 @@ fun ProfileLabScreen(
             when (step) {
                 0 -> CatalogStep(viewModel, catalog, selected)
                 1 -> ProviderStep(viewModel, selected)
-                2 -> DeployStep(viewModel, deploy, output, selected)
+                2 -> DeployStep(vm = viewModel, deploy = deploy, selected = selected)
             }
         }
     }
@@ -472,7 +472,7 @@ private fun ProviderStep(vm: ProfileLabViewModel, selected: Map<String, ProfileS
         items(selected.values.toList()) { sel ->
             var prov by remember { mutableStateOf(sel.provider) }
             var model by remember { mutableStateOf(sel.model) }
-            var key by remember { mutableStateOf(sel.apiKey) }
+            var key by remember { mutableStateOf(sel.apiKey.toString()) }
             var baseUrl by remember { mutableStateOf(sel.baseUrl) }
             val catalogList by vm.catalog.collectAsState()
             val meta = catalogList.firstOrNull { it.id == sel.id }
@@ -486,16 +486,25 @@ private fun ProviderStep(vm: ProfileLabViewModel, selected: Map<String, ProfileS
                         Text(sel.displayName, color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = prov, onValueChange = { prov = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
-                        label = { Text("Provider", color = MutedBlueGray) }, singleLine = true,
-                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    ProviderDropdown(
+                        label = "Provider",
+                        value = prov,
+                        options = listOf("openrouter", "anthropic", "gemini", "deepseek", "nous", "custom"),
+                        onSelected = { chosen ->
+                            prov = chosen
+                            // auto-fill del model di default dal preset
+                            val def = com.example.ui.ConfigBuilder.preset(chosen).model
+                            if (model.isBlank()) model = def
+                            vm.updateSelection(sel.id, prov, model, key, baseUrl)
+                        }
                     )
                     Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = model, onValueChange = { model = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
-                        label = { Text("Model (es. gemini-2.5-flash)", color = MutedBlueGray) }, singleLine = true,
-                        colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+                    ProviderDropdown(
+                        label = "Model (es. gemini-2.5-flash)",
+                        value = model,
+                        options = modelSuggestions(prov),
+                        onSelected = { model = it; vm.updateSelection(sel.id, prov, model, key, baseUrl) },
+                        allowFreeText = true
                     )
                     Spacer(Modifier.height(6.dp))
                     OutlinedTextField(
@@ -534,60 +543,96 @@ private fun ProviderStep(vm: ProfileLabViewModel, selected: Map<String, ProfileS
     }
 }
 
+/** Dropdown menu con opzioni reali. Se allowFreeText=true il valore può essere digitato liberamente. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProviderDropdown(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelected: (String) -> Unit,
+    allowFreeText: Boolean = false
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { if (allowFreeText) onSelected(it) },
+            readOnly = !allowFreeText,
+            label = { Text(label, color = MutedBlueGray) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = fieldColors(),
+            modifier = Modifier.menuAnchor().fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { opt ->
+                DropdownMenuItem(
+                    text = { Text(opt, color = PureWhite) },
+                    onClick = {
+                        onSelected(opt)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+/** Suggerimenti di model in base al provider (dal ConfigBuilder.preset). */
+private fun modelSuggestions(provider: String): List<String> {
+    val def = com.example.ui.ConfigBuilder.preset(provider).model
+    val common = when (provider) {
+        "openrouter" -> listOf("anthropic/claude-3.5-sonnet", "openai/gpt-4o", "google/gemini-2.5-pro")
+        "gemini" -> listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash")
+        "deepseek" -> listOf("deepseek-chat", "deepseek-reasoner")
+        "nous" -> listOf("nvidia/nemotron-3-ultra:free", "mistralai/mistral-large")
+        else -> emptyList()
+    }
+    return (listOf(def) + common).filter { it.isNotBlank() }.distinct()
+}
+
 @Composable
 private fun DeployStep(
     vm: ProfileLabViewModel,
     deploy: DeployConfig,
-    output: String,
     selected: Map<String, ProfileSelection>
 ) {
-    var mode by remember { mutableStateOf(deploy.mode) }
     var botToken by remember { mutableStateOf(deploy.botToken) }
-    var sshHost by remember { mutableStateOf(deploy.sshHost) }
-    var sshUser by remember { mutableStateOf(deploy.sshUser) }
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
 
     LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Text("Metodo di installazione", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("cli" to "CLI locale", "telegram" to "Telegram", "ssh" to "SSH server").forEach { (m, label) ->
-                    val active = mode == m
-                    Surface(
-                        onClick = { mode = m; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (active) ElectricCyan.copy(alpha = 0.2f) else CharcoalGray
-                    ) {
-                        Text(label, color = if (active) ElectricCyan else MutedBlueGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+            Text("🚀 Avvia il bot su Telegram", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Il bot viene creato live sul VPS hermesbro.cloud e risponde su Telegram. Servono il token del bot e (opzionale) un User ID.",
+                color = MutedBlueGray, fontSize = 11.sp
+            )
         }
-        if (mode == "telegram") {
-            item {
-                OutlinedTextField(value = botToken, onValueChange = { botToken = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
-                    label = { Text("Bot Token", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
-            }
-            item {
-                Text("Deploy su VPS (hermesbro.cloud)", color = ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(value = vm.launcherBaseUrl.value, onValueChange = { vm.setLauncherBaseUrl(it) },
-                    label = { Text("Launcher URL", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(value = vm.launchUserId.value, onValueChange = { vm.setLaunchUserId(it) },
-                    label = { Text("User ID (distingue le tue istanze)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
-                Text("Il bot viene creato live su Telegram sul VPS. Il secret è gestito dal server.", color = MutedBlueGray, fontSize = 10.sp)
-            }
+        item {
+            OutlinedTextField(
+                value = botToken,
+                onValueChange = { botToken = it; vm.setDeploy(DeployConfig("telegram", botToken, "", "")) },
+                label = { Text("Telegram Bot Token", color = MutedBlueGray) },
+                placeholder = { Text("123456:ABC-DEF...", color = MutedBlueGray) },
+                singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth()
+            )
         }
-        if (mode == "ssh") {
-            item {
-                OutlinedTextField(value = sshHost, onValueChange = { sshHost = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
-                    label = { Text("Host (es. 1.2.3.4)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(6.dp))
-                OutlinedTextField(value = sshUser, onValueChange = { sshUser = it; vm.setDeploy(DeployConfig(mode, botToken, sshHost, sshUser)) },
-                    label = { Text("User (es. hermes-pc)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
-            }
+        item {
+            Text("Launcher VPS", color = ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(value = vm.launcherBaseUrl.value, onValueChange = { vm.setLauncherBaseUrl(it) },
+                label = { Text("Launcher URL", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(value = vm.launchUserId.value, onValueChange = { vm.setLaunchUserId(it) },
+                label = { Text("User ID (opzionale, distingue le tue istanze)", color = MutedBlueGray) }, singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth())
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -595,54 +640,82 @@ private fun DeployStep(
                     onClick = { vm.setStep(1) },
                     border = BorderStroke(1.dp, SlateSteel),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = PureWhite),
-                    modifier = Modifier.weight(1.5f)
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text("Indietro")
                 }
                 Button(
-                    onClick = { vm.generate() },
+                    onClick = { vm.launchBot() },
                     colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack),
                     modifier = Modifier.weight(2f)
                 ) {
-                    Text("Genera file", fontWeight = FontWeight.Bold)
+                    Text("🚀 Avvia bot", fontWeight = FontWeight.Bold)
                 }
             }
         }
-        if (output.isNotBlank()) {
-            item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Output generato", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Button(onClick = {
-                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))
-                        vm.markCopied()
-                    }, colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = ObsidianBlack)) {
-                        Text(if (vm.copied.value) "Copiato ✓" else "Copia")
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
-                    Text(output, color = NeonGreen, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, modifier = Modifier.padding(12.dp))
+        item {
+            val isLaunching = vm.isLaunching.collectAsState().value
+            val launchResult = vm.launchResult.collectAsState().value
+            val launchError = vm.launchError.collectAsState().value
+            val statusMap = vm.instanceStatus.collectAsState().value
+            val isChecking = vm.isCheckingStatus.collectAsState().value
+            if (isLaunching) {
+                Text("⏳ Avvio del bot su VPS in corso...", color = ElectricCyan, fontSize = 12.sp)
+            }
+            launchError?.let { err ->
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DeepCyberPurple)) {
+                    Text("⚠ $err", color = PureWhite, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
                 }
             }
-            // Stato deploy reale su VPS (solo mode telegram) — dentro item{} per scope composable
-            if (mode == "telegram") {
-                item {
-                    val isLaunching = vm.isLaunching.collectAsState().value
-                    val launchResult = vm.launchResult.collectAsState().value
-                    val launchError = vm.launchError.collectAsState().value
-                    if (isLaunching) {
-                        Text("⏳ Deploy in corso su VPS...", color = ElectricCyan, fontSize = 12.sp)
-                    }
-                    launchError?.let { err ->
-                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DeepCyberPurple)) {
-                            Text("⚠ $err", color = PureWhite, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
+            launchResult?.let { res ->
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
+                    Column(Modifier.padding(10.dp)) {
+                        Text("✅ Bot avviato su VPS:", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(res, color = NeonGreen, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp)
+                        Spacer(Modifier.height(6.dp))
+                        Button(onClick = {
+                            clipboard.setText(androidx.compose.ui.text.AnnotatedString(res))
+                        }, colors = ButtonDefaults.buttonColors(containerColor = BrightTeal, contentColor = ObsidianBlack)) {
+                            Text("Copia risposta", fontSize = 11.sp)
                         }
                     }
-                    launchResult?.let { res ->
-                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = ObsidianBlack)) {
-                            Text("✅ Bot live su VPS:\n$res", color = NeonGreen, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
+                }
+            }
+            // Stato istanze
+            if (statusMap.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Stato bot:", color = ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                statusMap.forEach { (name, pair) ->
+                    val (instance, active) = pair
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CharcoalGray)) {
+                        Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(name, color = PureWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("istanza: $instance", color = MutedBlueGray, fontSize = 10.sp)
+                            }
+                            Text(
+                                if (active) "● ATTIVO" else "● OFFLINE",
+                                color = if (active) NeonGreen else CyberPink,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { vm.checkInstancesStatus() },
+                        border = BorderStroke(1.dp, SlateSteel),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PureWhite),
+                        modifier = Modifier.weight(1f)
+                    ) { Text(if (isChecking) "…" else "Aggiorna stato") }
+                    Button(
+                        onClick = { vm.stopInstances() },
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberPink, contentColor = PureWhite),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Ferma bot") }
                 }
             }
         }

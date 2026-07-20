@@ -17,9 +17,9 @@ import org.json.JSONObject
  * interpolazione di variabili Kotlin (errore di compilazione).
  */
 data class ProviderConfig(
-    val provider: String,   // openrouter | gemini | deepseek | nous | custom
+    val provider: String,   // openrouter | gemini | deepseek | nous | anthropic | custom
     val model: String,
-    val apiKey: String,     // inserita dall'utente a runtime, non hardcodata
+    val apiKey: String,
     val baseUrl: String = "",
     val apiMode: String = "openai",
     val maxTokens: Int = 8192
@@ -27,27 +27,47 @@ data class ProviderConfig(
 
 object ConfigBuilder {
 
-    /** Preset provider → (apiMode, maxTokens, baseUrlHint). */
+    /** Base URL di default per provider noti (formato OpenAI-compatible). */
+    private val PRESET_BASE_URLS = mapOf(
+        "openrouter" to "https://openrouter.ai/api/v1",
+        "gemini"     to "https://generativelanguage.googleapis.com/v1beta/openai",
+        "deepseek"   to "https://api.deepseek.com",
+        "nous"       to "https://api.nousresearch.com/v1",
+        "anthropic"  to "https://api.anthropic.com/v1"
+    )
+
+    /** Preset provider → (apiMode, maxTokens, baseUrlHint, defaultModel). */
     fun preset(provider: String): ProviderConfig {
-        return when (provider) {
-            "openrouter" -> ProviderConfig("openrouter", "anthropic/claude-3.5-sonnet", "", apiMode = "openai", maxTokens = 8192)
-            "gemini"     -> ProviderConfig("gemini", "gemini-2.5-flash", "", apiMode = "openai",
-                                baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai", maxTokens = 8192)
-            "deepseek"   -> ProviderConfig("deepseek", "deepseek-chat", "", apiMode = "openai",
-                                baseUrl = "https://api.deepseek.com", maxTokens = 8192)
-            "nous"       -> ProviderConfig("nous", "nvidia/nemotron-3-ultra:free", "", apiMode = "openai", maxTokens = 8192)
-            "custom"     -> ProviderConfig("custom", "", "", apiMode = "openai", maxTokens = 8192)
-            else         -> ProviderConfig(provider, "", "", apiMode = "openai", maxTokens = 8192)
+        val base = PRESET_BASE_URLS[provider] ?: ""
+        val def = when (provider) {
+            "openrouter" -> "anthropic/claude-3.5-sonnet"
+            "gemini"     -> "gemini-2.5-flash"
+            "deepseek"   -> "deepseek-chat"
+            "nous"       -> "nvidia/nemotron-3-ultra:free"
+            "anthropic"  -> "claude-3-5-sonnet"
+            "custom"     -> ""
+            else         -> ""
         }
+        val mode = if (provider == "anthropic") "anthropic" else "openai"
+        return ProviderConfig(provider, def, "", baseUrl = base, apiMode = mode, maxTokens = 8192)
     }
 
-    /** Genera il config.yaml completo per un singolo profilo. */
+    /**
+     * Genera il config.yaml completo per un singolo profilo.
+     * Formato collaudato su Hermes: api_mode sotto model:, type sotto providers:,
+     * riga provider: <nome>, model fully-qualified.
+     * La api_key e' OBBLIGATORIA (l'utente la inserisce nell'app): se assente
+     * la mettiamo come placeholder leggibile cosi' il deploy fallisce onestamente
+     * invece di girare con credenziali altrui.
+     */
     fun buildConfigYaml(profileId: String, pc: ProviderConfig): String {
         val provName = "${profileId}-provider"
-        val keyLine = if (pc.apiKey.isNotBlank()) "    api_key: ${pc.apiKey}\n" else "    # api_key: inserisci la tua key qui (o in .env)\n"
-        val baseLine = if (pc.baseUrl.isNotBlank()) "    base_url: ${pc.baseUrl}\n" else ""
+        // base_url: quello custom se dato, altrimenti il preset del provider
+        val effBase = pc.baseUrl.ifBlank { PRESET_BASE_URLS[pc.provider] ?: "" }
+        val keyLine = if (pc.apiKey.isNotBlank()) "    api_key: ${pc.apiKey}\n" else "    # API KEY MANCANTE: inseriscila nell'app prima del deploy\n    api_key: REPLACE_WITH_YOUR_KEY\n"
+        val baseLine = if (effBase.isNotBlank()) "    base_url: $effBase\n" else ""
+        val baseUrlModel = if (effBase.isNotBlank()) "  base_url: $effBase\n" else ""
         val modelLine = pc.model.ifBlank { "TODO_MODEL" }
-        val baseUrlModel = if (pc.baseUrl.isNotBlank()) "  base_url: ${pc.baseUrl}\n" else ""
         return """
 # Hermes profile: $profileId
 # Generato da HermesBro Profile Lab — config reale, nessun dato simulato.
@@ -198,11 +218,63 @@ echo "Su quel server lancia:  hermes -p $profileId"
                 conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
             }
             if (code !in 200..299) {
-                // prova a estrarre il messaggio FastAPI {"detail":"..."}
                 val msg = try {
                     JSONObject(resp).optString("detail", resp)
                 } catch (_: Exception) { resp }
                 throw Exception("Launcher HTTP $code: $msg")
+            }
+            return resp
+        }
+
+        /** Nome istanza systemd: <profile>_<userId-safe>. Deve combaciare col launcher VPS. */
+        fun instanceName(profile: String, userId: String): String {
+            val safe = userId.filter { it.isLetterOrDigit() }.take(16).ifBlank { "u" }
+            return "${profile}_$safe"
+        }
+
+        /** GET /api/bot-launch/status/<istanza> -> boolean active. */
+        fun isActive(baseUrl: String, instance: String): Boolean {
+            val url = "${baseUrl.trimEnd('/')}/api/bot-launch/status/${instance}"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+            val code = conn.responseCode
+            val resp = if (code in 200..299) {
+                conn.inputStream.bufferedReader().readText()
+            } else {
+                conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+            }
+            if (code !in 200..299) {
+                val msg = try { JSONObject(resp).optString("detail", resp) } catch (_: Exception) { resp }
+                throw Exception("Status HTTP $code: $msg")
+            }
+            return try { JSONObject(resp).optBoolean("active", false) } catch (_: Exception) { false }
+        }
+
+        /** POST /api/bot-launch/stop con {profile, telegram_token, user_id}. */
+        fun stop(baseUrl: String, profileId: String, userId: String): String {
+            val url = "${baseUrl.trimEnd('/')}/api/bot-launch/stop"
+            val obj = JSONObject()
+            obj.put("profile", profileId)
+            obj.put("telegram_token", "0:stop") // il launcher ricava instance da profile+user_id
+            obj.put("user_id", userId.ifBlank { "app" })
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+            conn.outputStream.use { it.write(obj.toString().toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            val resp = if (code in 200..299) {
+                conn.inputStream.bufferedReader().readText()
+            } else {
+                conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+            }
+            if (code !in 200..299) {
+                val msg = try { JSONObject(resp).optString("detail", resp) } catch (_: Exception) { resp }
+                throw Exception("Stop HTTP $code: $msg")
             }
             return resp
         }

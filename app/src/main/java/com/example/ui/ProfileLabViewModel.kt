@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -76,6 +77,64 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
     val isLaunching = MutableStateFlow(false)
     val launchResult = MutableStateFlow<String?>(null)
     val launchError = MutableStateFlow<String?>(null)
+
+    // Stato istanze dopo il deploy: mappa "displayName" -> (instance, active)
+    val instanceStatus = MutableStateFlow<Map<String, Pair<String, Boolean>>>(emptyMap())
+    val isCheckingStatus = MutableStateFlow(false)
+
+    /** Interroga il launcher per ogni istanza avviata e aggiorna instanceStatus. */
+    fun checkInstancesStatus() {
+        val token = deploy.value.botToken
+        val sel = selected.value.values.toList()
+        if (sel.isEmpty() || token.isBlank()) return
+        viewModelScope.launch(Dispatchers.Default) {
+            isCheckingStatus.value = true
+            val map = mutableMapOf<String, Pair<String, Boolean>>()
+            try {
+                sel.forEach { s ->
+                    val instance = ConfigBuilder.LaunchClient.instanceName(s.id, launchUserId.value)
+                    val ok = ConfigBuilder.LaunchClient.isActive(
+                        baseUrl = launcherBaseUrl.value,
+                        instance = instance
+                    )
+                    map[s.displayName] = instance to ok
+                }
+                instanceStatus.value = map
+            } catch (e: Exception) {
+                launchError.value = "Status: ${e.message}"
+            } finally {
+                isCheckingStatus.value = false
+            }
+        }
+    }
+
+    /** Ferma (stop+disable) tutte le istanze avviate da questa config. */
+    fun stopInstances() {
+        val token = deploy.value.botToken
+        val sel = selected.value.values.toList()
+        if (sel.isEmpty() || token.isBlank()) return
+        viewModelScope.launch(Dispatchers.Default) {
+            isLaunching.value = true
+            launchError.value = null
+            var lastMsg = ""
+            try {
+                sel.forEach { s ->
+                    val instance = ConfigBuilder.LaunchClient.instanceName(s.id, launchUserId.value)
+                    lastMsg = ConfigBuilder.LaunchClient.stop(
+                        baseUrl = launcherBaseUrl.value,
+                        profileId = s.id,
+                        userId = launchUserId.value
+                    )
+                }
+                launchResult.value = lastMsg
+                instanceStatus.value = emptyMap()
+            } catch (e: Exception) {
+                launchError.value = "Stop: ${e.message}"
+            } finally {
+                isLaunching.value = false
+            }
+        }
+    }
 
     init {
         loadCatalog()
@@ -460,53 +519,58 @@ class ProfileLabViewModel(application: Application) : AndroidViewModel(applicati
 
     fun markCopied() { copied.value = true }
 
-    /** Assembla l'output reale: per ogni profilo scelto genera SOUL + config + deploy script. */
-    fun generate() {
+    /**
+     * Avvia direttamente i bot su Telegram tramite il Launcher VPS.
+     * Nessun file su disco: chiama deployToTelegram() per ogni profilo selezionato
+     * (POST reale a hermesbro.cloud/api/bot-launch/launch).
+     */
+    fun launchBot() {
+        val token = deploy.value.botToken
+        if (token.isBlank()) {
+            launchError.value = "Inserisci il Telegram bot token per avviare il bot"
+            return
+        }
         viewModelScope.launch(Dispatchers.Default) {
             val sel = selected.value.values.toList()
-            val sb = StringBuilder()
-            sel.forEach { s ->
-                val soul = getSoul(s.id)
-                val pc = ProviderConfig(
-                    provider = s.provider,
-                    model = s.model.ifBlank { ConfigBuilder.preset(s.provider).model },
-                    apiKey = s.apiKey,
-                    baseUrl = s.baseUrl,
-                    apiMode = if (s.provider == "anthropic") "anthropic" else "openai"
-                )
-                val cfg = ConfigBuilder.buildConfigYaml(s.id, pc)
-                sb.appendLine("================ PROFILO: ${s.displayName} (${s.id}) ================")
-                sb.appendLine()
-                sb.appendLine("----- SOUL.md -----")
-                sb.appendLine(soul)
-                sb.appendLine()
-                sb.appendLine("----- config.yaml -----")
-                sb.appendLine(cfg)
-                sb.appendLine()
-                when (deploy.value.mode) {
-                    "telegram" -> {
-                        sb.appendLine("----- DEPLOY TELEGRAM -----")
-                        sb.appendLine(ConfigBuilder.buildTelegramStep(deploy.value.botToken, s.id))
-                    }
-                    "ssh" -> {
-                        sb.appendLine("----- DEPLOY SSH (${deploy.value.sshUser}@${deploy.value.sshHost}) -----")
-                        sb.appendLine(ConfigBuilder.buildSshDeploy(deploy.value.sshHost, deploy.value.sshUser, s.id, soul, cfg))
-                    }
-                    else -> {
-                        sb.appendLine("----- DEPLOY CLI -----")
-                        sb.appendLine(ConfigBuilder.buildCliDeployScript(s.id, soul, cfg))
-                    }
+            if (sel.isEmpty()) {
+                launchError.value = "Nessun profilo selezionato"
+                return@launch
+            }
+            isLaunching.value = true
+            launchError.value = null
+            launchResult.value = null
+            val results = mutableListOf<String>()
+            try {
+                sel.forEach { s ->
+                    val isCustom = prefs.contains("custom_soul_${s.id}")
+                    val soul = if (isCustom) getSoul(s.id) else ""
+                    // Config SEMPRE inviato (cosi' il launcher applica provider/model/key scelti).
+                    // Per i profili esistenti il launcher lo usa per sovrascrivere il clone.
+                    val pc = ProviderConfig(
+                        provider = s.provider,
+                        model = s.model.ifBlank { ConfigBuilder.preset(s.provider).model },
+                        apiKey = s.apiKey,
+                        baseUrl = s.baseUrl,
+                        apiMode = if (s.provider == "anthropic") "anthropic" else "openai"
+                    )
+                    val cfg = ConfigBuilder.buildConfigYaml(s.id, pc)
+                    val resp = ConfigBuilder.LaunchClient.launch(
+                        baseUrl = launcherBaseUrl.value,
+                        profileId = s.id,
+                        botToken = token,
+                        userId = launchUserId.value,
+                        soul = soul,
+                        configYaml = cfg
+                    )
+                    results.add("${s.displayName}: $resp")
                 }
-                sb.appendLine()
-            }
-            generatedOutput.value = sb.toString()
-            prefs.edit().putString("generated_output", sb.toString()).apply()
-            withContext(Dispatchers.Main) {
-                addCurrentConfigToSaved()
-            }
-            // Deploy reale su VPS se mode=telegram e token presente
-            if (deploy.value.mode == "telegram" && deploy.value.botToken.isNotBlank()) {
-                deployToTelegram()
+                launchResult.value = results.joinToString("\n")
+            } catch (e: Exception) {
+                launchError.value = e.message ?: "Errore sconosciuto nel launch"
+            } finally {
+                isLaunching.value = false
+                withContext(Dispatchers.Main) { addCurrentConfigToSaved() }
+                checkInstancesStatus()
             }
         }
     }
